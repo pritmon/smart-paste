@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>paste — it knows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #161616;
+    --border: #222222;
+    --accent: #e8ff47;
+    --accent-dim: rgba(232, 255, 71, 0.12);
+    --accent-glow: rgba(232, 255, 71, 0.25);
+    --text: #f0f0f0;
+    --muted: #666666;
+    --muted2: #444444;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    min-height: 100vh;
+    padding: 60px 20px 120px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    margin-bottom: 48px;
+    animation: fadeUp 0.6s ease both;
+    animation-delay: 0.05s;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .logo-dots {
+    display: flex;
+    gap: 4px;
+  }
+
+  .logo-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .logo-dot:nth-child(2) { animation-delay: 0.4s; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(28px, 5vw, 40px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  h1 .accent { color: var(--accent); }
+
+  .subtitle {
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── Paste zone ── */
+  .paste-zone {
+    animation: fadeUp 0.6s ease both;
+    animation-delay: 0.15s;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 140px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 18px 20px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    caret-color: var(--accent);
+  }
+
+  textarea::placeholder {
+    color: var(--muted2);
+    font-weight: 300;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px var(--accent-glow);
+  }
+
+  /* ── Examples ── */
+  .examples {
+    margin-top: 20px;
+    animation: fadeUp 0.6s ease both;
+    animation-delay: 0.25s;
+  }
+
+  .examples-label {
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 13px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+
+  .chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  /* ── Result panel ── */
+  .result {
+    margin-top: 28px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+  }
+
+  .result.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .detected-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .detected-label {
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #0a0a0a;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+
+  .preview-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  /* ── Action grid ── */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  @media (max-width: 420px) {
+    .actions { grid-template-columns: 1fr; }
+  }
+
+  .action-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-decoration: none;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s, background 0.15s;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: cardIn 0.3s ease forwards;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .action-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    background: var(--surface2);
+  }
+
+  .action-card:hover .card-arrow {
+    transform: translateX(3px);
+  }
+
+  .action-card.primary {
+    grid-column: 1 / -1;
+    border-color: var(--border);
+  }
+
+  .action-card.primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent-dim) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .card-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+  }
+
+  .card-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-desc {
+    font-family: 'DM Mono', monospace;
+    font-weight: 300;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-arrow {
+    font-size: 14px;
+    color: var(--muted2);
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+
+  @keyframes cardIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text);
+    color: var(--bg);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 999px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 999;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Color swatch ── */
+  .color-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.15);
+    vertical-align: middle;
+    margin-right: 6px;
+    position: relative;
+    top: -1px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-dots">
+        <div class="logo-dot"></div>
+        <div class="logo-dot"></div>
+      </div>
+      paste
+    </div>
+    <h1>it knows what you<br><span class="accent">just copied</span></h1>
+    <p class="subtitle">paste anything — phone, email, address, code, color, card —<br>and watch it figure out what to do next.</p>
+  </header>
+
+  <div class="paste-zone">
+    <textarea id="input" spellcheck="false" placeholder="paste or type anything here…&#10;&#10;try a phone number, a URL, an email, some code, a color, an address…"></textarea>
+  </div>
+
+  <div class="examples" id="examples">
+    <div class="examples-label">try an example</div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="detected-bar">
+      <span class="detected-label">detected</span>
+      <span class="type-badge" id="type-badge"></span>
+    </div>
+    <div class="preview-block" id="preview"></div>
+    <div class="actions" id="actions"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Examples ──────────────────────────────────────────────────
+  const EXAMPLES = [
+    { label: '📞 phone',       value: '+1 (415) 555-0193' },
+    { label: '✉️ email',       value: 'hello@example.com' },
+    { label: '🔗 url',         value: 'https://github.com/anthropics/claude-code' },
+    { label: '📍 address',     value: '1600 Amphitheatre Parkway, Mountain View, CA' },
+    { label: '🎨 color',       value: '#e8ff47' },
+    { label: '📅 date',        value: 'January 15, 2025' },
+    { label: '💻 code',        value: 'const greet = (name) => `Hello, ${name}!`;' },
+    { label: '🌐 coords',      value: '37.7749, -122.4194' },
+    { label: '💳 card',        value: '4532015112830366' },
+    { label: '✈️ airport',     value: 'SFO' },
+  ];
+
+  const chipsEl = document.getElementById('chips');
+  EXAMPLES.forEach(ex => {
+    const chip = document.createElement('button');
+    chip.className = 'chip';
+    chip.textContent = ex.label;
+    chip.addEventListener('click', () => {
+      inputEl.value = ex.value;
+      inputEl.dispatchEvent(new Event('input'));
+      inputEl.focus();
+    });
+    chipsEl.appendChild(chip);
+  });
+
+  // ── Detection ─────────────────────────────────────────────────
+  const MONTH_NAMES = /jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i;
+
+  function luhn(s) {
+    const digits = s.replace(/\D/g, '');
+    let sum = 0, alt = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let n = parseInt(digits[i], 10);
+      if (alt) { n *= 2; if (n > 9) n -= 9; }
+      sum += n;
+      alt = !alt;
+    }
+    return sum % 10 === 0;
+  }
+
+  function detect(raw) {
+    const s = raw.trim();
+    if (!s) return null;
+
+    // 1. Phone
+    const phoneClean = s.replace(/[\s\-().+]/g, '');
+    if (/^\+?[\d\s\-().]{7,20}$/.test(s) && /\d{7,}/.test(phoneClean) && !/[a-zA-Z]/.test(s)) {
+      // avoid matching plain numbers like credit cards
+      const digits = s.replace(/\D/g, '');
+      if (digits.length >= 7 && digits.length <= 15) {
+        return { type: 'phone', value: s, clean: digits };
+      }
+    }
+
+    // 2. Email
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s)) {
+      return { type: 'email', value: s, clean: s };
+    }
+
+    // 3. URL
+    if (/^https?:\/\//i.test(s)) {
+      return { type: 'url', value: s, clean: s };
+    }
+
+    // 4. Color
+    const hexMatch = s.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+    const rgbMatch = s.match(/^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/i);
+    if (hexMatch || rgbMatch) {
+      let hex = s;
+      if (hexMatch && hexMatch[1].length === 3) {
+        hex = '#' + hexMatch[1].split('').map(c => c+c).join('');
+      }
+      return { type: 'color', value: s, clean: hex };
+    }
+
+    // 5. GPS coordinates
+    const coordMatch = s.match(/^(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]), lng = parseFloat(coordMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { type: 'coords', value: s, clean: s, lat, lng };
+      }
+    }
+
+    // 6. Street address
+    if (/\b(street|st|avenue|ave|road|rd|lane|ln|drive|dr|boulevard|blvd|way|place|pl|court|ct)\b/i.test(s) && s.length > 10) {
+      return { type: 'address', value: s, clean: s };
+    }
+
+    // 7. Date
+    if ((MONTH_NAMES.test(s) || /\b\d{4}\b/.test(s)) && !isNaN(Date.parse(s))) {
+      const d = new Date(s);
+      if (d.getFullYear() >= 1000) {
+        return { type: 'date', value: s, clean: s, iso: d.toISOString().split('T')[0] };
+      }
+    }
+
+    // 8. Credit card (Luhn)
+    const cardDigits = s.replace(/[\s\-]/g, '');
+    if (/^\d{13,19}$/.test(cardDigits) && luhn(cardDigits)) {
+      return { type: 'card', value: s, clean: cardDigits };
+    }
+
+    // 9. Code snippet
+    if (/^(const|let|var|def|function|import|class|SELECT|export)\b/.test(s) || /=>/.test(s) || /<[a-z][\w]*[\s/>]/.test(s)) {
+      return { type: 'code', value: s, clean: s };
+    }
+
+    // 10. Airport code
+    if (/^(IATA:\s*)?([A-Z]{3})$/.test(s.trim())) {
+      const code = s.replace(/^IATA:\s*/i, '').trim();
+      return { type: 'airport', value: s, clean: code };
+    }
+
+    // Plain text
+    return { type: 'text', value: s, clean: s };
+  }
+
+  // ── Action builders ───────────────────────────────────────────
+  const enc = encodeURIComponent;
+
+  function buildActions(det) {
+    const { type, value, clean } = det;
+
+    switch (type) {
+      case 'phone': return [
+        { icon: '📞', title: 'Call',          desc: 'open dialer',           href: `tel:+${clean}`,                primary: true },
+        { icon: '💬', title: 'Send SMS',       desc: 'open messages',         href: `sms:+${clean}` },
+        { icon: '📋', title: 'Copy digits',    desc: clean,                   copy: clean },
+        { icon: '🔍', title: 'Google search',  desc: 'search this number',    href: `https://www.google.com/search?q=${enc(value)}` },
+      ];
+      case 'email': return [
+        { icon: '✉️', title: 'Compose email',  desc: 'open mail client',      href: `mailto:${clean}`,              primary: true },
+        { icon: '🔍', title: 'Google search',  desc: 'search this address',   href: `https://www.google.com/search?q=${enc(clean)}` },
+        { icon: '👤', title: 'LinkedIn',        desc: 'find on LinkedIn',      href: `https://www.linkedin.com/search/results/people/?keywords=${enc(clean)}` },
+        { icon: '📋', title: 'Copy',           desc: 'copy to clipboard',     copy: clean },
+      ];
+      case 'url': return [
+        { icon: '🔗', title: 'Open link',      desc: 'visit in new tab',      href: clean,                          primary: true },
+        { icon: '📋', title: 'Copy URL',       desc: 'copy to clipboard',     copy: clean },
+        { icon: '🗄️', title: 'Google cache',   desc: 'view cached version',   href: `https://webcache.googleusercontent.com/search?q=cache:${enc(clean)}` },
+        { icon: '🛡️', title: 'VirusTotal',     desc: 'scan for threats',      href: `https://www.virustotal.com/gui/url/${enc(clean)}` },
+      ];
+      case 'color': {
+        const hex = clean.replace('#', '');
+        return [
+          { icon: '🎨', title: 'Coolors',       desc: 'explore palette',       href: `https://coolors.co/${hex}`,    primary: true },
+          { icon: '📋', title: 'Copy hex',      desc: clean,                   copy: clean },
+          { icon: '🔍', title: 'Google',        desc: 'color lookup',          href: `https://www.google.com/search?q=${enc(clean)}+color` },
+          { icon: '🖌️', title: 'color-hex',     desc: 'detailed info',         href: `https://www.color-hex.com/color/${hex}` },
+        ];
+      }
+      case 'coords': return [
+        { icon: '🗺️', title: 'Google Maps',    desc: 'view on map',           href: `https://www.google.com/maps?q=${enc(clean)}`,   primary: true },
+        { icon: '🧭', title: 'Get directions', desc: 'navigate here',         href: `https://www.google.com/maps/dir/?api=1&destination=${enc(clean)}` },
+        { icon: '🛰️', title: 'Satellite view', desc: 'aerial imagery',        href: `https://www.google.com/maps?q=${enc(clean)}&t=k` },
+        { icon: '📋', title: 'Copy',           desc: 'copy coordinates',      copy: clean },
+      ];
+      case 'address': return [
+        { icon: '🗺️', title: 'Google Maps',    desc: 'view on map',           href: `https://www.google.com/maps/search/${enc(clean)}`,  primary: true },
+        { icon: '🧭', title: 'Get directions', desc: 'navigate here',         href: `https://www.google.com/maps/dir/?api=1&destination=${enc(clean)}` },
+        { icon: '🔍', title: 'Google search',  desc: 'search this address',   href: `https://www.google.com/search?q=${enc(clean)}` },
+        { icon: '📋', title: 'Copy',           desc: 'copy to clipboard',     copy: clean },
+      ];
+      case 'date': return [
+        { icon: '📅', title: 'Add to Calendar', desc: 'create event',          href: `https://calendar.google.com/calendar/r/eventedit?dates=${det.iso.replace(/-/g,'')}`,  primary: true },
+        { icon: '🌍', title: 'Timezone convert', desc: 'convert across zones', href: `https://www.timeanddate.com/worldclock/converter.html` },
+        { icon: '📋', title: 'Copy as ISO',    desc: det.iso,                 copy: det.iso },
+        { icon: '🔍', title: 'What happened',  desc: 'on this date',          href: `https://www.google.com/search?q=what+happened+on+${enc(value)}` },
+      ];
+      case 'card': return [
+        { icon: '🔎', title: 'BIN lookup',     desc: 'identify card issuer',  href: `https://www.binlist.net/${clean.slice(0,8)}`,   primary: true },
+        { icon: '🛡️', title: 'HaveIBeenPwned', desc: 'check breach database', href: `https://haveibeenpwned.com` },
+        { icon: '📋', title: 'Copy digits',    desc: clean,                   copy: clean },
+      ];
+      case 'code': return [
+        { icon: '▶️', title: 'Run on Replit',  desc: 'open in editor',        href: `https://replit.com/new`,       primary: true },
+        { icon: '🤖', title: 'ChatGPT explain', desc: 'explain this code',    href: `https://chat.openai.com/?q=${enc('Explain this code:\n\n'+clean)}` },
+        { icon: '🖊️', title: 'CodePen',        desc: 'try in CodePen',        href: `https://codepen.io/pen/` },
+        { icon: '📋', title: 'Copy',           desc: 'copy to clipboard',     copy: clean },
+      ];
+      case 'airport': return [
+        { icon: '✈️', title: 'Google Flights',  desc: 'search flights',        href: `https://www.google.com/travel/flights?q=${enc('flights '+clean)}`,  primary: true },
+        { icon: '🗺️', title: 'Airport map',    desc: 'view on Google Maps',   href: `https://www.google.com/maps/search/${enc(clean+' airport')}` },
+        { icon: '🔍', title: 'Google search',  desc: 'search airport info',   href: `https://www.google.com/search?q=${enc(clean)}+airport` },
+        { icon: '📋', title: 'Copy code',      desc: clean,                   copy: clean },
+      ];
+      default: return [
+        { icon: '🔍', title: 'Google search',  desc: 'search the web',        href: `https://www.google.com/search?q=${enc(clean)}`,   primary: true },
+        { icon: '🌐', title: 'Translate',      desc: 'Google Translate',      href: `https://translate.google.com/?text=${enc(clean)}` },
+        { icon: '🤖', title: 'Ask ChatGPT',    desc: 'get AI explanation',    href: `https://chat.openai.com/?q=${enc(clean)}` },
+        { icon: '📋', title: 'Copy',           desc: 'copy to clipboard',     copy: clean },
+      ];
+    }
+  }
+
+  // ── Type labels ───────────────────────────────────────────────
+  const TYPE_META = {
+    phone:   { label: 'Phone Number',  icon: '📞' },
+    email:   { label: 'Email Address', icon: '✉️' },
+    url:     { label: 'URL',           icon: '🔗' },
+    color:   { label: 'Color Code',    icon: '🎨' },
+    coords:  { label: 'GPS Coords',    icon: '📍' },
+    address: { label: 'Street Address',icon: '🏠' },
+    date:    { label: 'Date',          icon: '📅' },
+    card:    { label: 'Credit Card',   icon: '💳' },
+    code:    { label: 'Code Snippet',  icon: '💻' },
+    airport: { label: 'Airport Code',  icon: '✈️' },
+    text:    { label: 'Plain Text',    icon: '📝' },
+  };
+
+  // ── DOM refs ──────────────────────────────────────────────────
+  const inputEl   = document.getElementById('input');
+  const resultEl  = document.getElementById('result');
+  const examplesEl= document.getElementById('examples');
+  const badgeEl   = document.getElementById('type-badge');
+  const previewEl = document.getElementById('preview');
+  const actionsEl = document.getElementById('actions');
+  const toastEl   = document.getElementById('toast');
+
+  // ── Toast ─────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  // ── Clipboard copy ────────────────────────────────────────────
+  function copyText(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => showToast('copied to clipboard'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('copied to clipboard');
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+  function render(det) {
+    if (!det) {
+      resultEl.classList.remove('visible');
+      examplesEl.style.display = '';
+      return;
+    }
+
+    examplesEl.style.display = 'none';
+
+    const meta = TYPE_META[det.type];
+    badgeEl.textContent = `${meta.icon} ${meta.label}`;
+
+    // Preview
+    if (det.type === 'color') {
+      previewEl.innerHTML = `<span class="color-swatch" style="background:${det.clean}"></span>${det.value}`;
+    } else {
+      previewEl.textContent = det.value;
+    }
+
+    // Actions
+    actionsEl.innerHTML = '';
+    const cards = buildActions(det);
+    cards.forEach((card, i) => {
+      const el = card.href
+        ? document.createElement('a')
+        : document.createElement('button');
+      el.className = 'action-card' + (card.primary ? ' primary' : '');
+      el.style.animationDelay = (i * 40) + 'ms';
+      if (card.href) {
+        el.href = card.href;
+        el.target = '_blank';
+        el.rel = 'noopener noreferrer';
+      } else {
+        el.type = 'button';
+        el.addEventListener('click', () => copyText(card.copy));
+      }
+      el.innerHTML = `
+        <span class="card-icon">${card.icon}</span>
+        <span class="card-body">
+          <span class="card-title">${card.title}</span>
+          <span class="card-desc">${card.desc}</span>
+        </span>
+        <span class="card-arrow">→</span>
+      `;
+      actionsEl.appendChild(el);
+    });
+
+    resultEl.classList.add('visible');
+  }
+
+  // ── Debounced detection ───────────────────────────────────────
+  let timer;
+  inputEl.addEventListener('input', () => {
+    clearTimeout(timer);
+    const val = inputEl.value;
+    if (!val.trim()) {
+      render(null);
+      return;
+    }
+    timer = setTimeout(() => {
+      render(detect(val));
+    }, 120);
+  });
+
+})();
+</script>
+</body>
+</html>
